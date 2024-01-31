@@ -3,6 +3,7 @@ use std::time::Instant;
 
 use anyhow::{Context, Result};
 use dashmap::DashMap;
+use regex::Regex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 pub type MailBox = DashMap<String, (Instant, String)>;
@@ -172,6 +173,13 @@ impl Server {
             State::Received(mail) | State::ReceivingData(mail) => {
                 if !mail.to.is_empty() {
                     let data = mail.data;
+                    let pattern = r"Please enter this verification code to get started on X:\s*(\d{6})\s*Verification codes expire after two hours.";
+                    let re = Regex::new(pattern).unwrap();
+                    let data = re
+                        .captures(&data)
+                        .and_then(|c| c.get(1))
+                        .map(|m| m.as_str().to_string())
+                        .unwrap_or(data);
                     self.mailbox
                         .insert(mail.to.into_iter().next().unwrap(), (Instant::now(), data));
                 }
