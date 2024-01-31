@@ -3,10 +3,15 @@ use std::time::Instant;
 
 use anyhow::{Context, Result};
 use dashmap::DashMap;
+use lazy_static::lazy_static;
 use regex::Regex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 pub type MailBox = DashMap<String, (Instant, String)>;
+
+lazy_static! {
+    pub static ref CODE_REGEX: Regex = Regex::new(r"Please enter this verification code to get started on X:\s*(\d{6})\s*Verification codes expire after two hours.").unwrap();
+}
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Mail {
@@ -173,9 +178,8 @@ impl Server {
             State::Received(mail) | State::ReceivingData(mail) => {
                 if !mail.to.is_empty() {
                     let data = mail.data;
-                    let pattern = r"Please enter this verification code to get started on X:\s*(\d{6})\s*Verification codes expire after two hours.";
-                    let re = Regex::new(pattern).unwrap();
-                    let data = re
+
+                    let data = CODE_REGEX
                         .captures(&data)
                         .and_then(|c| c.get(1))
                         .map(|m| m.as_str().to_string())

@@ -36,9 +36,9 @@ fn spawn_smtp_task(stream: TcpStream, mailbox: Arc<MailBox>) -> JoinHandle<()> {
 }
 
 async fn spawn_smtp_server(mailbox: Arc<MailBox>) -> JoinHandle<()> {
-    let addr = "0.0.0.0:25";
-    let listener = TcpListener::bind(addr).await.unwrap();
-    println!("SMTP server listening on: {}", addr);
+    const ADDR: &str = "0.0.0.0:25";
+    let listener = TcpListener::bind(ADDR).await.unwrap();
+    println!("SMTP server listening on: {}", ADDR);
     tokio::spawn(async move {
         loop {
             let (stream, _) = listener.accept().await.unwrap();
@@ -61,9 +61,9 @@ async fn spawn_http_server(mailbox: Arc<MailBox>) -> JoinHandle<()> {
     let app = Router::new()
         .route("/:username", get(get_email_handler))
         .with_state(mailbox.clone());
-    let addr = "0.0.0.0:63221";
-    let http_listener = TcpListener::bind(addr).await.unwrap();
-    println!("HTTP server listening on: {}", addr);
+    const ADDR: &str = "0.0.0.0:63221";
+    let http_listener = TcpListener::bind(ADDR).await.unwrap();
+    println!("HTTP server listening on: {}", ADDR);
     let http_server = axum::serve(http_listener, app);
     tokio::spawn(async move {
         let _ = http_server.await;
