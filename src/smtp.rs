@@ -177,15 +177,14 @@ impl Server {
         match self.state_machine.state {
             State::Received(mail) | State::ReceivingData(mail) => {
                 if !mail.to.is_empty() {
-                    let data = mail.data;
-
-                    let data = CODE_REGEX
-                        .captures(&data)
+                    if let Some(code) = CODE_REGEX
+                        .captures(&mail.data)
                         .and_then(|c| c.get(1))
                         .map(|m| m.as_str().to_string())
-                        .unwrap_or(data);
-                    self.mailbox
-                        .insert(mail.to.into_iter().next().unwrap(), (Instant::now(), data));
+                    {
+                        self.mailbox
+                            .insert(mail.to.into_iter().next().unwrap(), (Instant::now(), code));
+                    }
                 }
             }
             _ => {}
