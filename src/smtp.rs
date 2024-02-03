@@ -13,6 +13,11 @@ lazy_static! {
     pub static ref CODE_REGEX: Regex = Regex::new(r"Please enter this verification code to get started on X:\s*(\d{6})\s*Verification codes expire after two hours.").unwrap();
 }
 
+lazy_static! {
+    pub static ref CODE_REGEX2: Regex =
+        Regex::new(r"following single-use code.\s*([a-z0-9]{8})\s*If this was").unwrap();
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Mail {
     pub from: String,
@@ -182,6 +187,15 @@ impl Server {
                         .and_then(|c| c.get(1))
                         .map(|m| m.as_str().to_string())
                     {
+                        // println!("{} {}", mail.to.first().unwrap(), code);
+                        self.mailbox
+                            .insert(mail.to.into_iter().next().unwrap(), (Instant::now(), code));
+                    } else if let Some(code) = CODE_REGEX2
+                        .captures(&mail.data)
+                        .and_then(|c| c.get(1))
+                        .map(|m| m.as_str().to_string())
+                    {
+                        // println!("{} {}", mail.to.first().unwrap(), code);
                         self.mailbox
                             .insert(mail.to.into_iter().next().unwrap(), (Instant::now(), code));
                     }
