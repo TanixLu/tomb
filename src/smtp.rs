@@ -7,6 +7,8 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+const DEBUG: bool = false;
+
 pub type MailBox = DashMap<String, (Instant, String)>;
 
 lazy_static! {
@@ -187,7 +189,9 @@ impl Server {
                         .and_then(|c| c.get(1))
                         .map(|m| m.as_str().to_string())
                     {
-                        // println!("{} {}", mail.to.first().unwrap(), code);
+                        if DEBUG {
+                            println!("{} code1: {}", mail.to.first().unwrap(), code);
+                        }
                         self.mailbox
                             .insert(mail.to.into_iter().next().unwrap(), (Instant::now(), code));
                     } else if let Some(code) = CODE_REGEX2
@@ -195,9 +199,19 @@ impl Server {
                         .and_then(|c| c.get(1))
                         .map(|m| m.as_str().to_string())
                     {
-                        // println!("{} {}", mail.to.first().unwrap(), code);
+                        if DEBUG {
+                            println!("{} code2: {}", mail.to.first().unwrap(), code);
+                        }
                         self.mailbox
                             .insert(mail.to.into_iter().next().unwrap(), (Instant::now(), code));
+                    } else {
+                        if DEBUG {
+                            println!("{} no code", mail.to.first().unwrap());
+                            self.mailbox.insert(
+                                mail.to.into_iter().next().unwrap(),
+                                (Instant::now(), mail.data),
+                            );
+                        }
                     }
                 }
             }
