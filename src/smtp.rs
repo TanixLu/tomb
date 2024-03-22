@@ -7,8 +7,6 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-const DEBUG: bool = false;
-
 pub type MailBox = DashMap<String, (Instant, String)>;
 
 lazy_static! {
@@ -151,6 +149,7 @@ pub struct Server {
     stream: tokio::net::TcpStream,
     state_machine: StateMachine,
     mailbox: Arc<MailBox>,
+    debug: bool,
 }
 
 impl Server {
@@ -159,11 +158,13 @@ impl Server {
         domain: impl AsRef<str>,
         stream: tokio::net::TcpStream,
         mailbox: Arc<MailBox>,
+        debug: bool,
     ) -> Self {
         Self {
             stream,
             state_machine: StateMachine::new(domain),
             mailbox,
+            debug,
         }
     }
 
@@ -191,7 +192,7 @@ impl Server {
         match self.state_machine.state {
             State::Received(mail) | State::ReceivingData(mail) => {
                 if !mail.to.is_empty() {
-                    if DEBUG {
+                    if self.debug {
                         let mut from = String::new();
                         let mut to = String::new();
                         let mut subject = String::new();

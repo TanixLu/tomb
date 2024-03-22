@@ -1,6 +1,6 @@
 mod smtp;
 
-use std::{sync::Arc, time::Duration};
+use std::{env, sync::Arc, time::Duration};
 
 use axum::{
     extract::{Path, State},
@@ -27,22 +27,22 @@ fn spawn_cleaning_task(mailbox: Arc<MailBox>) -> JoinHandle<()> {
     })
 }
 
-fn spawn_smtp_task(stream: TcpStream, mailbox: Arc<MailBox>) -> JoinHandle<()> {
+fn spawn_smtp_task(stream: TcpStream, mailbox: Arc<MailBox>, debug: bool) -> JoinHandle<()> {
     tokio::spawn(async move {
-        let _ = smtp::Server::new("mail.xiwata.com", stream, mailbox)
+        let _ = smtp::Server::new("mail.0utl0ok.com", stream, mailbox, debug)
             .serve()
             .await;
     })
 }
 
-async fn spawn_smtp_server(mailbox: Arc<MailBox>) -> JoinHandle<()> {
+async fn spawn_smtp_server(mailbox: Arc<MailBox>, debug: bool) -> JoinHandle<()> {
     const ADDR: &str = "0.0.0.0:25";
     let listener = TcpListener::bind(ADDR).await.unwrap();
     println!("SMTP server listening on: {}", ADDR);
     tokio::spawn(async move {
         loop {
             let (stream, _) = listener.accept().await.unwrap();
-            let _ = spawn_smtp_task(stream, mailbox.clone());
+            let _ = spawn_smtp_task(stream, mailbox.clone(), debug);
         }
     })
 }
@@ -72,10 +72,16 @@ async fn spawn_http_server(mailbox: Arc<MailBox>) -> JoinHandle<()> {
 
 #[tokio::main]
 async fn main() {
+    let args: Vec<String> = env::args().collect();
+    let debug = args.get(1) == Some(&"debug".to_string());
+    if debug {
+        println!("debug mode is on");
+    }
+
     let mailbox = Arc::new(MailBox::new());
 
     let cleaning_task = spawn_cleaning_task(mailbox.clone());
-    let smtp_server = spawn_smtp_server(mailbox.clone()).await;
+    let smtp_server = spawn_smtp_server(mailbox.clone(), debug).await;
     let http_server = spawn_http_server(mailbox.clone()).await;
 
     let _ = tokio::join!(cleaning_task, smtp_server, http_server);
