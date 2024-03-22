@@ -12,12 +12,19 @@ const DEBUG: bool = false;
 pub type MailBox = DashMap<String, (Instant, String)>;
 
 lazy_static! {
-    pub static ref CODE_REGEX: Regex = Regex::new(r"Please enter this verification code to get started on X:\s*(\d{6})\s*Verification codes expire after two hours.").unwrap();
+    pub static ref CODE_REGEX1: Regex = Regex::new(r"Please enter this verification code to get started on X:\s*(\d{6})\s*Verification codes expire after two hours.").unwrap();
 }
 
 lazy_static! {
     pub static ref CODE_REGEX2: Regex =
         Regex::new(r"following single-use code.\s*([a-z0-9]{8})\s*If this was").unwrap();
+}
+
+fn extract_pattern(regex: &Regex, data: &str) -> Option<String> {
+    regex
+        .captures(data)
+        .and_then(|c| c.get(1))
+        .map(|m| m.as_str().to_string())
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -184,33 +191,45 @@ impl Server {
         match self.state_machine.state {
             State::Received(mail) | State::ReceivingData(mail) => {
                 if !mail.to.is_empty() {
-                    if let Some(code) = CODE_REGEX
-                        .captures(&mail.data)
-                        .and_then(|c| c.get(1))
-                        .map(|m| m.as_str().to_string())
-                    {
-                        if DEBUG {
-                            println!("{} code1: {}", mail.to.first().unwrap(), code);
+                    if DEBUG {
+                        let mut from = String::new();
+                        let mut to = String::new();
+                        let mut subject = String::new();
+                        let mut date = String::new();
+                        for line in mail.data.lines() {
+                            let line = line.trim();
+                            if line.starts_with("Date:") {
+                                date = line.to_string();
+                            } else if line.starts_with("From:") {
+                                from = line.to_string();
+                            } else if line.starts_with("To:") {
+                                to = line.to_string();
+                            } else if line.starts_with("Subject:") {
+                                subject = line.to_string();
+                            }
                         }
-                        self.mailbox
-                            .insert(mail.to.into_iter().next().unwrap(), (Instant::now(), code));
-                    } else if let Some(code) = CODE_REGEX2
-                        .captures(&mail.data)
-                        .and_then(|c| c.get(1))
-                        .map(|m| m.as_str().to_string())
-                    {
-                        if DEBUG {
-                            println!("{} code2: {}", mail.to.first().unwrap(), code);
-                        }
-                        self.mailbox
-                            .insert(mail.to.into_iter().next().unwrap(), (Instant::now(), code));
+                        let (email_type, code) =
+                            if let Some(code) = extract_pattern(&CODE_REGEX1, &mail.data) {
+                                let mail_to = mail.to.into_iter().next().unwrap();
+                                self.mailbox.insert(mail_to, (Instant::now(), code.clone()));
+                                ("code1".to_string(), code)
+                            } else if let Some(code) = extract_pattern(&CODE_REGEX2, &mail.data) {
+                                let mail_to = mail.to.into_iter().next().unwrap();
+                                self.mailbox.insert(mail_to, (Instant::now(), code.clone()));
+                                ("code2".to_string(), code)
+                            } else {
+                                let mail_to = mail.to.into_iter().next().unwrap();
+                                self.mailbox.insert(mail_to, (Instant::now(), mail.data));
+                                ("no_code".to_string(), "no_code".to_string())
+                            };
+                        println!("{from} {to} {subject} {date} {email_type} {code}");
                     } else {
-                        if DEBUG {
-                            println!("{} no code", mail.to.first().unwrap());
-                            self.mailbox.insert(
-                                mail.to.into_iter().next().unwrap(),
-                                (Instant::now(), mail.data),
-                            );
+                        if let Some(code) = extract_pattern(&CODE_REGEX1, &mail.data) {
+                            let mail_to = mail.to.into_iter().next().unwrap();
+                            self.mailbox.insert(mail_to, (Instant::now(), code.clone()));
+                        } else if let Some(code) = extract_pattern(&CODE_REGEX2, &mail.data) {
+                            let mail_to = mail.to.into_iter().next().unwrap();
+                            self.mailbox.insert(mail_to, (Instant::now(), code.clone()));
                         }
                     }
                 }
